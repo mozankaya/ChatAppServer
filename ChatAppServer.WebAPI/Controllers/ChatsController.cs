@@ -1,8 +1,10 @@
 ﻿using ChatAppServer.WebAPI.Data;
 using ChatAppServer.WebAPI.DTOs;
+using ChatAppServer.WebAPI.Hubs;
 using ChatAppServer.WebAPI.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChatAppServer.WebAPI.Controllers
@@ -13,10 +15,12 @@ namespace ChatAppServer.WebAPI.Controllers
     {
 
         private readonly ApplicationDbContext _context;
+        private readonly IHubContext<ChatHub> _hubContext;
 
-        public ChatsController(ApplicationDbContext context)
+        public ChatsController(ApplicationDbContext context, IHubContext<ChatHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         [HttpGet]
@@ -45,6 +49,10 @@ namespace ChatAppServer.WebAPI.Controllers
 
             await _context.Chats.AddAsync(chat,cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
+
+            string connectionId = ChatHub.Users.First(p => p.Value == chat.ToUserId).Key;
+
+            await _hubContext.Clients.Client(connectionId).SendAsync("Message", chat);
 
             return Ok(chat);
         }
